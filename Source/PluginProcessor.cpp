@@ -93,8 +93,13 @@ void AuralZenAudioProcessor::changeProgramName (int index, const juce::String& n
 //==============================================================================
 void AuralZenAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
+    InGainSmooth.reset(sampleRate, 0.001f);
+    MidGainSmooth.reset(sampleRate, 0.001f);
+    SideGainSmooth.reset(sampleRate, 0.001f);
+    ClippingSmooth.reset(sampleRate, 0.001f);
+    ClippingWetSmooth.reset(sampleRate, 0.001f);
+    OutGainSmooth.reset(sampleRate, 0.001f);
+    HPFSmooth.reset(sampleRate,0.001f);
 }
 
 void AuralZenAudioProcessor::releaseResources()
@@ -143,6 +148,18 @@ void AuralZenAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
+    auto* inDataL = buffer.getWritePointer(0);
+    auto* inDataR = buffer.getWritePointer(1);
+    auto* outDataL = buffer.getWritePointer(0);
+    auto* outDataR = buffer.getWritePointer(1);
+    InGainSmooth.setTargetValue(apvts.getRawParameterValue("InGain") -> load());
+    MidGainSmooth.setTargetValue(apvts.getRawParameterValue("Mid") -> load());
+    SideGainSmooth.setTargetValue(apvts.getRawParameterValue("Side") -> load());
+    HPFSmooth.setTargetValue(apvts.getRawParameterValue("HPFCutoff") ->load());
+    ClippingSmooth.setTargetValue(apvts.getRawParameterValue("Clipping") -> load());
+    ClippingWetSmooth.setTargetValue(apvts.getRawParameterValue("ClippingWet") -> load());
+    
+    OutGainSmooth.setTargetValue(apvts.getRawParameterValue("OutGain") -> load());
 
     // This is the place where you'd normally do the guts of your plugin's
     // audio processing...
@@ -150,11 +167,16 @@ void AuralZenAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     // the samples and the outer loop is handling the channels.
     // Alternatively, you can process the samples with the channels
     // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    for (int i = 0; i < buffer.getNumSamples(); i++)
     {
-        auto* channelData = buffer.getWritePointer (channel);
-
-        // ..do something to the data...
+        ClipOffset = 1.f - ClippingWetSmooth.getNextValue();
+        HPF.setCutoff(HPFSmooth.getNextValue());
+        Mid = (0.5f*(inDataL[i] + inDataR[i]) * MidGainSmooth.getNextValue())*InGainSmooth.getNextValue();
+        Side = (0.5f*(inDataL[i] - inDataR[i]) * SideGainSmooth.getNextValue()) * InGainSmooth.getNextValue();
+        HighPassStage = + HPF.process(Mid+Side);
+        ClippingStage =  ClipOffset * (HighPassStage) + (1.57079632679 *atan((HighPassStage) *ClippingSmooth.getNextValue())) * ClippingWetSmooth.getNextValue();
+        outDataL[i] = (Mid + Side + ClippingStage) * OutGainSmooth.getNextValue();
+        outDataR[i] = (Mid + Side + ClippingStage) * OutGainSmooth.getNextValue();
     }
 }
 
@@ -172,16 +194,62 @@ juce::AudioProcessorEditor* AuralZenAudioProcessor::createEditor()
 //==============================================================================
 void AuralZenAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    juce::MemoryOutputStream mos (destData, true);
+           apvts.state.writeToStream(mos);
 }
 
 void AuralZenAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    auto tree = juce::ValueTree::readFromData(data, sizeInBytes);
+               if(tree.isValid() )
+               {
+                   apvts.replaceState(tree);
+               }
 }
+
+juce::AudioProcessorValueTreeState::ParameterLayout
+AuralZenAudioProcessor::createParameterLayout()
+{
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
+    
+    layout.add(std::make_unique<juce::AudioParameterFloat>("InGain",
+                                                           "InGain",
+                                                            0.0f,
+                                                            1.f,
+                                                            0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>("Mid",
+                                                           "Mid",
+                                                            0.0f,
+                                                            5.f,
+                                                            0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>("Side",
+                                                           "Side",
+                                                            0.0f,
+                                                            5.f,
+                                                            0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>("HPFCutoff",
+                                                           "HPFCutoff",
+                                                            0.1f,
+                                                            1.f,
+                                                            0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>("Clipping",
+                                                           "Clipping",
+                                                            1.f,
+                                                            10.f,
+                                                            5.f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>("ClippingWet",
+                                                           "ClippingWet",
+                                                            .5f,
+                                                            1.f,
+                                                            .5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>("OutGain",
+                                                           "OutGain",
+                                                            0.0f,
+                                                            1.f,
+                                                            0.5f));
+    return layout;
+}
+
 
 //==============================================================================
 // This creates new instances of the plugin..

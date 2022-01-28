@@ -5,6 +5,10 @@
               pluginManufacturer="CodeZenAudio">
   <MAINGROUP id="tpTlA4" name="AuralZen">
     <GROUP id="{325A2F43-8DC3-E3DD-C06F-4CB618F962E8}" name="Source">
+      <FILE id="fHAmbT" name="HighPassFilter.cpp" compile="1" resource="0"
+            file="Source/HighPassFilter.cpp"/>
+      <FILE id="dbU4Vs" name="HighPassFilter.h" compile="0" resource="0"
+            file="Source/HighPassFilter.h"/>
       <FILE id="BHxUx6" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="XhUPsF" name="PluginProcessor.h" compile="0" resource="0"
@@ -34,6 +38,7 @@
         <MODULEPATH id="juce_graphics" path="../../../Applications/JUCE/modules"/>
         <MODULEPATH id="juce_gui_basics" path="../../../Applications/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../Applications/JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../../Applications/JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -47,6 +52,7 @@
     <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
