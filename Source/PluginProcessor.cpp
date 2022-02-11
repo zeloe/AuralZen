@@ -160,7 +160,9 @@ void AuralZenAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     ClippingWetSmooth.setTargetValue(apvts.getRawParameterValue("ClippingWet") -> load());
     
     OutGainSmooth.setTargetValue(apvts.getRawParameterValue("OutGain") -> load());
-
+    float Mid = 0, Side = 0, ClippingStageMid = 0, ClippingStageSide = 0, HighPassStageMid = 0, HighPassStageSide = 0;
+    float ClipOffset = 0;
+    
     // This is the place where you'd normally do the guts of your plugin's
     // audio processing...
     // Make sure to reset the state if your inner loop is processing
@@ -169,14 +171,25 @@ void AuralZenAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     // interleaved by keeping the same state.
     for (int i = 0; i < buffer.getNumSamples(); i++)
     {
+        
+        
         ClipOffset = 1.f - ClippingWetSmooth.getNextValue();
-        HPF.setCutoff(HPFSmooth.getNextValue());
+        HPFMid.setCutoff(HPFSmooth.getNextValue());
+        HPFSide.setCutoff(HPFSmooth.getNextValue());
         Mid = (0.5f*(inDataL[i] + inDataR[i]) * MidGainSmooth.getNextValue())*InGainSmooth.getNextValue();
-        Side = (0.5f*(inDataL[i] - inDataR[i]) * SideGainSmooth.getNextValue()) * InGainSmooth.getNextValue();
-        HighPassStage = + HPF.process(Mid+Side);
-        ClippingStage =  ClipOffset * (HighPassStage) + (1.57079632679 *atan((HighPassStage) *ClippingSmooth.getNextValue())) * ClippingWetSmooth.getNextValue();
-        outDataL[i] = (Mid + Side + ClippingStage) * OutGainSmooth.getNextValue();
-        outDataR[i] = (Mid + Side + ClippingStage) * OutGainSmooth.getNextValue();
+        Side = (0.5f*(inDataL[i] - inDataR[i]) * SideGainSmooth.getNextValue())*InGainSmooth.getNextValue();
+        //Saturation/Clipping Process
+        HighPassStageMid = HPFMid.process(Mid);
+        HighPassStageSide = HPFSide.process(Side);
+        ClippingStageMid = ClipOffset * (HighPassStageMid) + (static_cast<float>(HALFPI) * atan(HighPassStageMid * ClippingSmooth.getNextValue() )) * ClippingWetSmooth.getNextValue();
+        ClippingStageSide =  ClipOffset * (HighPassStageSide) + (static_cast<float>(HALFPI) * atan(HighPassStageSide * ClippingSmooth.getNextValue() )) * ClippingWetSmooth.getNextValue();
+        outDataL[i] = (Mid + Side + (ClippingStageMid + ClippingStageSide)) * OutGainSmooth.getNextValue();
+        outDataR[i] = (Mid - Side + (ClippingStageMid - ClippingStageSide)) * OutGainSmooth.getNextValue();
+        
+        /*
+         (static_cast<float>(HALFPI) * atan(channelDataLeft[i] * destructionmapped * clippingmapped)
+         
+         */
     }
 }
 
@@ -234,12 +247,12 @@ AuralZenAudioProcessor::createParameterLayout()
                                                             0.5f));
     layout.add(std::make_unique<juce::AudioParameterFloat>("Clipping",
                                                            "Clipping",
-                                                            1.f,
+                                                            0.1f,
                                                             10.f,
-                                                            5.f));
+                                                            0.5f));
     layout.add(std::make_unique<juce::AudioParameterFloat>("ClippingWet",
                                                            "ClippingWet",
-                                                            .5f,
+                                                            0.0f,
                                                             1.f,
                                                             .5f));
     layout.add(std::make_unique<juce::AudioParameterFloat>("OutGain",
